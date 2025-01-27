@@ -40,11 +40,6 @@
             flex-wrap: wrap;
             gap: 15px;
         }
-        .grid .card iframe {
-            width: 100%;
-            height: 300px;
-            border: none;
-        }
         footer {
             text-align: center;
             padding: 20px;
@@ -61,41 +56,70 @@
 
     <div class="container">
         <h2>Indicadores em Destaque</h2>
-        <div class="grid">
-            <div class="card">
-                <h3>Índice de Volatilidade S&P 500</h3>
-                <iframe src="https://br.investing.com/indices/volatility-s-p-500-chart" loading="lazy"></iframe>
-            </div>
-            <div class="card">
-                <h3>Preço do Petróleo Brent</h3>
-                <iframe src="https://br.investing.com/commodities/brent-oil-streaming-chart" loading="lazy"></iframe>
-            </div>
-            <div class="card">
-                <h3>Ações da Vale S.A.</h3>
-                <iframe src="https://br.investing.com/equities/vale-s.a.--americ-chart" loading="lazy"></iframe>
-            </div>
-            <div class="card">
-                <h3>Ações da Petrobras</h3>
-                <iframe src="https://br.investing.com/equities/petroleo-brasileiro-a-chart" loading="lazy"></iframe>
-            </div>
-            <div class="card">
-                <h3>Índice Dólar (DXY)</h3>
-                <iframe src="https://br.tradingview.com/symbols/TVC-DXY/" loading="lazy"></iframe>
-            </div>
-            <div class="card">
-                <h3>Futuros Dow Jones</h3>
-                <iframe src="https://br.investing.com/indices/us-30-futures-chart?cid=1175152" loading="lazy"></iframe>
-            </div>
-        </div>
-
-        <h2>Calendário Econômico</h2>
-        <div class="card">
-            <iframe src="https://br.investing.com/economic-calendar/" loading="lazy" style="height: 600px;"></iframe>
+        <div class="grid" id="market-data">
+            <!-- Os cards de dados serão gerados dinamicamente aqui -->
         </div>
     </div>
 
     <footer>
         <p>&copy; 2025 Painel Econômico. Todos os direitos reservados.</p>
     </footer>
+
+    <script>
+        const apiKey = "TVP6SP0FQONK0HZN";
+        const symbols = ["AAPL", "MSFT", "GOOGL", "AMZN", "TSLA"];
+        const marketDataContainer = document.getElementById("market-data");
+
+        async function fetchMarketData() {
+            marketDataContainer.innerHTML = "<p>Carregando dados...</p>";
+            const promises = symbols.map(async (symbol) => {
+                const url = `https://www.alphavantage.co/query?function=TIME_SERIES_INTRADAY&symbol=${symbol}&interval=5min&apikey=${apiKey}`;
+                const response = await fetch(url);
+                const data = await response.json();
+
+                if (data["Time Series (5min)"]) {
+                    const lastRefreshed = data["Meta Data"]["3. Last Refreshed"];
+                    const lastData = data["Time Series (5min)"][lastRefreshed];
+                    const price = parseFloat(lastData["1. open"]);
+                    const change = (parseFloat(lastData["4. close"]) - price).toFixed(2);
+                    const percentChange = ((change / price) * 100).toFixed(2);
+
+                    return {
+                        symbol,
+                        price: price.toFixed(2),
+                        change,
+                        percentChange,
+                    };
+                } else {
+                    console.error(`Erro ao buscar dados para ${symbol}`);
+                    return null;
+                }
+            });
+
+            const results = await Promise.all(promises);
+
+            renderMarketData(results.filter((item) => item !== null));
+        }
+
+        function renderMarketData(data) {
+            marketDataContainer.innerHTML = "";
+            data.forEach((item) => {
+                const card = document.createElement("div");
+                card.className = "card";
+                card.innerHTML = `
+                    <h3>${item.symbol}</h3>
+                    <p>Preço: <strong>$${item.price}</strong></p>
+                    <p style="color: ${item.change >= 0 ? 'green' : 'red'};">
+                        ${item.change >= 0 ? '+' : ''}${item.change} (${item.percentChange}%)
+                    </p>
+                `;
+                marketDataContainer.appendChild(card);
+            });
+        }
+
+        // Atualiza os dados a cada 60 segundos
+        fetchMarketData();
+        setInterval(fetchMarketData, 60000);
+    </script>
 </body>
 </html>
